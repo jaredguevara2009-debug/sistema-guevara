@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+{% block title %}Comprobante {{ sale.number }}{% endblock %}
+{% block page_title %}Comprobante de venta{% endblock %}
+{% block content %}
+<div class="receipt-actions"><a class="btn btn-quiet" href="{{ url_for('operations.pos') }}">← Volver a ventas</a><button class="btn btn-primary" data-print type="button">Imprimir comprobante <span>↗</span></button></div>
+<article class="receipt-card">
+  <div class="receipt-brand">
+    {% if logo_available %}<span class="receipt-logo-wrap"><img class="receipt-logo" src="{{ url_for('static',filename='img/logo.png') }}" alt="Logotipo oficial de Repuestos Guevara"></span>{% else %}<span class="brand-mark">RG</span>{% endif %}
+    <div><strong>{{ business_name }}</strong><small>COMPROBANTE DE VENTA</small></div>
+  </div>
+  <div class="receipt-number"><span>VENTA</span><strong>{{ sale.number }}</strong></div>
+  <div class="receipt-meta">
+    <div><span>Fecha y hora</span><strong>{{ sale.created_at|local_dt }}</strong></div>
+    <div><span>Atendido por</span><strong>{{ sale.user.name if sale.user else '—' }}</strong></div>
+    <div><span>Cliente</span><strong>{{ sale.customer.name if sale.customer else 'Consumidor final' }}</strong></div>
+    <div><span>Pago</span><strong>{{ sale.payment_method }}</strong></div>
+  </div>
+  <div class="table-scroll"><table><thead><tr><th>PRODUCTO</th><th>CANT.</th><th>PRECIO</th><th>IMPORTE</th></tr></thead><tbody>
+    {% for line in sale.lines %}<tr><td><strong>{{ line.product_name }}</strong><small class="subline">{{ line.sku }}</small></td><td>{{ line.quantity }}</td><td>{{ line.unit_price|money }}</td><td class="amount-cell">{{ line.line_total|money }}</td></tr>{% endfor %}
+  </tbody></table></div>
+  <div class="receipt-summary"><div><span>Subtotal</span><b>{{ sale.subtotal|money }}</b></div>{% if sale.discount %}<div><span>Descuento</span><b>− {{ sale.discount|money }}</b></div>{% endif %}<div class="receipt-total"><span>TOTAL</span><strong>{{ sale.total|money }}</strong></div></div>
+  <p class="receipt-thanks">{{ receipt_message }}<br><small>Este documento es un comprobante comercial y no una factura fiscal.</small></p>
+  {% if business_phone or business_address %}<div class="receipt-contact">{{ business_phone }}{% if business_phone and business_address %} · {% endif %}{{ business_address }}</div>{% endif %}
+</article>
+{% endblock %}

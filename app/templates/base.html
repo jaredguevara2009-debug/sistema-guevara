@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#17191d"><title>{% block title %}Panel{% endblock %} · {{ business_name }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/overrides.css') }}">
+  <script defer src="{{ url_for('static', filename='js/app.js') }}"></script>
+  {% block head %}{% endblock %}
+</head>
+<body class="app-shell" data-role="{{ current_user.role }}">
+  <div class="mobile-shade" data-close-nav></div>
+  <aside class="sidebar" id="sidebar">
+    <a class="brand" href="{{ url_for('views.dashboard') }}">
+      {% if logo_available %}<span class="brand-logo-wrap"><img class="brand-logo" src="{{ url_for('static',filename='img/logo.png') }}" alt="Logotipo oficial de {{ business_name }}"></span>{% else %}<span class="brand-mark">RG</span>{% endif %}<span class="brand-copy"><strong>{{ business_name }}</strong><small>GESTIÓN COMERCIAL</small></span>
+    </a>
+    <div class="nav-caption">GENERAL</div>
+    <nav class="side-nav">
+      <a class="nav-item {{ 'active' if request.endpoint == 'views.dashboard' }}" href="{{ url_for('views.dashboard') }}"><span class="nav-icon">◫</span>Resumen</a>
+      <a class="nav-item {{ 'active' if request.endpoint == 'catalog.products' }}" href="{{ url_for('catalog.products') }}"><span class="nav-icon">▦</span>Productos</a>
+      {% if current_user.role in ['admin','warehouse'] %}
+      <a class="nav-item {{ 'active' if request.endpoint == 'operations.inventory' }}" href="{{ url_for('operations.inventory') }}"><span class="nav-icon">⇄</span>Inventario</a>
+      <a class="nav-item {{ 'active' if request.endpoint in ['catalog.categories','catalog.brands'] }}" href="{{ url_for('catalog.categories') }}"><span class="nav-icon">◈</span>Categorías y marcas</a>
+      {% endif %}
+      <div class="nav-caption nav-caption-space">OPERACIONES</div>
+      {% if current_user.role in ['admin','seller'] %}
+      <a class="nav-item {{ 'active' if request.endpoint == 'operations.pos' }}" href="{{ url_for('operations.pos') }}"><span class="nav-icon">▣</span>Punto de venta</a>
+      <a class="nav-item {{ 'active' if request.endpoint == 'catalog.directory' and request.view_args and request.view_args.get('kind') == 'clientes' }}" href="{{ url_for('catalog.directory',kind='clientes') }}"><span class="nav-icon">♙</span>Clientes</a>
+      <a class="nav-item {{ 'active' if request.endpoint == 'operations.cash' }}" href="{{ url_for('operations.cash') }}"><span class="nav-icon">◷</span>Caja</a>
+      {% endif %}
+      {% if current_user.role in ['admin','warehouse'] %}
+      <a class="nav-item {{ 'active' if request.endpoint in ['operations.purchases','operations.purchase_new'] }}" href="{{ url_for('operations.purchases') }}"><span class="nav-icon">⇣</span>Compras</a>
+      <a class="nav-item {{ 'active' if request.endpoint == 'catalog.directory' and request.view_args and request.view_args.get('kind') == 'proveedores' }}" href="{{ url_for('catalog.directory',kind='proveedores') }}"><span class="nav-icon">⌂</span>Proveedores</a>
+      {% endif %}
+      {% if current_user.role == 'admin' %}
+      <a class="nav-item {{ 'active' if request.endpoint == 'operations.expenses' }}" href="{{ url_for('operations.expenses') }}"><span class="nav-icon">−</span>Gastos</a>
+      {% endif %}
+      <a class="nav-item {{ 'active' if request.endpoint == 'views.reports' }}" href="{{ url_for('views.reports') }}"><span class="nav-icon">▥</span>Reportes</a>
+      {% if current_user.role == 'admin' %}
+      <div class="nav-caption nav-caption-space">ADMINISTRACIÓN</div>
+      <a class="nav-item {{ 'active' if request.endpoint == 'views.users' }}" href="{{ url_for('views.users') }}"><span class="nav-icon">♧</span>Usuarios</a>
+      <a class="nav-item {{ 'active' if request.endpoint == 'operations.audit_log' }}" href="{{ url_for('operations.audit_log') }}"><span class="nav-icon">≡</span>Auditoría</a>
+      <a class="nav-item {{ 'active' if request.endpoint == 'views.settings' }}" href="{{ url_for('views.settings') }}"><span class="nav-icon">⚙</span>Configuración</a>
+      {% endif %}
+    </nav>
+    <div class="sidebar-bottom">
+      <div class="secure-chip"><span class="secure-dot"></span><span><strong>Sesión segura</strong><small>Acceso privado al negocio</small></span></div>
+      <form action="{{ url_for('auth.logout') }}" method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="logout-btn" type="submit"><span>↪</span> Cerrar sesión</button></form>
+    </div>
+  </aside>
+
+  <main class="main-area">
+    <header class="topbar">
+      <button class="icon-btn menu-toggle" aria-label="Abrir menú" data-menu-toggle>☰</button>
+      <div class="crumb"><span>Repuestos Guevara</span><b>/</b><strong>{% block page_title %}Resumen{% endblock %}</strong></div>
+      <div class="topbar-actions">
+        <form class="global-search" action="{{ url_for('catalog.products') }}" method="get"><span>⌕</span><input name="q" placeholder="Buscar productos…" aria-label="Buscar productos"><kbd>↵</kbd></form>
+        <a class="icon-btn alert-btn" href="{{ url_for('operations.inventory') if current_user.role in ['admin','warehouse'] else url_for('views.reports') }}" title="Alertas de inventario">♧</a>
+        <div class="user-pill"><span class="avatar">{{ current_user.name[:1]|upper }}</span><span class="user-copy"><strong>{{ current_user.name }}</strong><small>{{ {'admin':'Administrador','seller':'Vendedor','warehouse':'Almacenero','viewer':'Consulta'}.get(current_user.role,current_user.role) }}</small></span></div>
+      </div>
+    </header>
+    <div class="page-wrap">
+      <div class="flash-stack" aria-live="polite">
+        {% for category, message in get_flashed_messages(with_categories=true) %}<div class="flash flash-{{ category }}"><span>{{ '✓' if category=='success' else '!' }}</span>{{ message }}<button type="button" data-dismiss aria-label="Cerrar">×</button></div>{% endfor %}
+      </div>
+      {% block content %}{% endblock %}
+      <footer class="app-footer"><span>© {{ now.year }} {{ business_name }}</span><span>Gestión clara para cada jornada</span></footer>
+    </div>
+  </main>
+</body>
+</html>

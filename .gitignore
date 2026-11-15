@@ -1,0 +1,13 @@
+.env
+.venv/
+__pycache__/
+*.py[cod]
+instance/*.db
+instance/*
+!instance/.gitkeep
+backups/
+.pytest_cache/
+*.log
+app/static/uploads/**
+!app/static/uploads/.gitkeep
+migrations/versions/*.pyc
