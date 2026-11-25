@@ -16,19 +16,30 @@
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       {% if editing %}<input type="hidden" name="item_id" value="{{ editing.id }}">{% endif %}
       <label class="field"><span>Nombre <b>*</b></span><input required maxlength="100" name="name" value="{{ form_data.get('name','') if form_data else (editing.name if editing else '') }}" placeholder="Nombre de {{ kind }}"></label>
-      {% if kind == 'categoría' %}<label class="field"><span>Descripción</span><textarea name="description" rows="3">{{ form_data.get('description','') if form_data else (editing.description if editing else '') }}</textarea></label>{% endif %}
+      {% if kind == 'categoría' %}
+        <label class="field"><span>Descripción</span><textarea name="description" rows="3">{{ form_data.get('description','') if form_data else (editing.description if editing else '') }}</textarea></label>
+      {% else %}
+        <fieldset class="category-choice"><legend>Categorías relacionadas <b>*</b></legend>
+          <p>Elige una o varias categorías. En productos solo aparecerán las marcas compatibles con su categoría.</p>
+          <div class="category-check-grid">
+            {% for category in categories %}
+              <label class="category-check"><input type="checkbox" name="category_ids" value="{{ category.id }}" {{ 'checked' if category.id in selected_category_ids }}><span>{{ category.name }}{{ ' · Inactiva' if not category.active }}</span></label>
+            {% else %}<small>Primero crea una categoría.</small>{% endfor %}
+          </div>
+        </fieldset>
+      {% endif %}
       <div class="form-actions inline-actions"><button class="btn btn-primary" type="submit">{{ 'Guardar cambios' if editing else 'Crear ' ~ kind }} <span>→</span></button>{% if editing %}<a class="btn btn-quiet" href="{{ url_for(endpoint) }}">Cancelar</a>{% endif %}</div>
     </form>
   </section>
   <section class="panel list-panel">
     <div class="panel-head padded-head"><div><h2>Registradas</h2><p>{{ rows|length }} {{ kind }}(s)</p></div><span class="status status-green">{{ rows|selectattr('active')|list|length }} activas</span></div>
     <div class="table-scroll"><table>
-      <thead><tr><th>NOMBRE</th>{% if kind == 'categoría' %}<th>DESCRIPCIÓN</th>{% endif %}<th>ESTADO</th><th>ACCIONES</th></tr></thead>
+      <thead><tr><th>NOMBRE</th>{% if kind == 'categoría' %}<th>DESCRIPCIÓN</th>{% else %}<th>CATEGORÍAS</th>{% endif %}<th>ESTADO</th><th>ACCIONES</th></tr></thead>
       <tbody>
       {% for row in rows %}
         <tr>
           <td class="table-primary">{{ row.name }}</td>
-          {% if kind == 'categoría' %}<td>{{ row.description or '—' }}</td>{% endif %}
+          {% if kind == 'categoría' %}<td>{{ row.description or '—' }}</td>{% else %}<td class="brand-category-list">{% for category in row.categories %}<span class="category-tag">{{ category.name }}</span>{% else %}<span class="muted-small">Sin categorías asignadas</span>{% endfor %}</td>{% endif %}
           <td><span class="status {{ 'status-green' if row.active else 'status-gray' }}">{{ 'Activa' if row.active else 'Inactiva' }}</span></td>
           <td><div class="row-actions">
             <a class="btn btn-quiet btn-small" href="{{ url_for(endpoint, editar=row.id) }}">Editar</a>
@@ -36,7 +47,7 @@
             <form method="post" action="{{ url_for('catalog.delete_taxonomy',kind='categorias' if kind=='categoría' else 'marcas',item_id=row.id) }}" data-confirm="¿Eliminar {{ row.name }}? Si hay productos asociados, se desactivará para conservarlos."><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="text-button danger-text" type="submit">Eliminar</button></form>
           </div></td>
         </tr>
-      {% else %}<tr><td colspan="{{ 4 if kind == 'categoría' else 3 }}"><div class="empty-state"><strong>No hay {{ kind }}s todavía</strong><small>Crea el primero con el formulario.</small></div></td></tr>{% endfor %}
+      {% else %}<tr><td colspan="4"><div class="empty-state"><strong>No hay {{ kind }}s todavía</strong><small>Crea el primero con el formulario.</small></div></td></tr>{% endfor %}
       </tbody>
     </table></div>
   </section>

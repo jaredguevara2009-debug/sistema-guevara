@@ -2,9 +2,17 @@ from datetime import datetime
 from decimal import Decimal
 
 from flask_login import UserMixin
+from sqlalchemy.dialects.mysql import MEDIUMBLOB
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from app.extensions import db
+
+
+brand_categories = db.Table(
+    "brand_categories",
+    db.Column("brand_id", db.Integer, db.ForeignKey("brands.id", ondelete="CASCADE"), primary_key=True),
+    db.Column("category_id", db.Integer, db.ForeignKey("categories.id", ondelete="CASCADE"), primary_key=True),
+)
 
 
 class TimestampMixin:
@@ -38,6 +46,7 @@ class Category(TimestampMixin, db.Model):
     name = db.Column(db.String(100), unique=True, nullable=False)
     description = db.Column(db.String(255))
     active = db.Column(db.Boolean, nullable=False, default=True)
+    brands = db.relationship("Brand", secondary=brand_categories, back_populates="categories")
 
 
 class Brand(TimestampMixin, db.Model):
@@ -45,6 +54,7 @@ class Brand(TimestampMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), unique=True, nullable=False)
     active = db.Column(db.Boolean, nullable=False, default=True)
+    categories = db.relationship(Category, secondary=brand_categories, back_populates="brands")
 
 
 class Supplier(TimestampMixin, db.Model):
@@ -116,6 +126,18 @@ class Product(TimestampMixin, db.Model):
     category = db.relationship(Category)
     brand = db.relationship(Brand)
     supplier = db.relationship(Supplier)
+    image_blob = db.relationship("ProductImage", back_populates="product", uselist=False,
+                                 cascade="all, delete-orphan", passive_deletes=True)
+
+
+class ProductImage(db.Model):
+    """Durable optimized image bytes for deployments with ephemeral filesystems."""
+    __tablename__ = "product_images"
+    product_id = db.Column(db.Integer, db.ForeignKey("products.id", ondelete="CASCADE"), primary_key=True)
+    image_data = db.Column(db.LargeBinary().with_variant(MEDIUMBLOB(), "mysql"), nullable=False)
+    mime_type = db.Column(db.String(40), nullable=False, default="image/webp")
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    product = db.relationship(Product, back_populates="image_blob")
 
 
 class InventoryMovement(db.Model):

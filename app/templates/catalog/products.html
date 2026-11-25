@@ -21,7 +21,7 @@
     <tbody>
     {% for p in page.items %}
       <tr>
-        <td><div class="product-cell"><span class="product-thumb">{% if p.image_path %}<img src="{{ url_for('static',filename=p.image_path) }}" alt="">{% else %}<span>▦</span>{% endif %}</span><span><strong>{{ p.name }}</strong><small>{{ p.brand.name if p.brand else 'Sin marca' }}{% if p.model_reference %} · {{ p.model_reference }}{% endif %}</small></span></div></td>
+        <td><div class="product-cell"><span class="product-thumb">{% if p.image_path %}<img src="{{ product_image_url(p) }}" alt="">{% else %}<span>▦</span>{% endif %}</span><span><strong>{{ p.name }}</strong><small>{{ p.brand.name if p.brand else 'Sin marca' }}{% if p.model_reference %} · {{ p.model_reference }}{% endif %}</small></span></div></td>
         <td>{{ p.category.name if p.category else '—' }}</td><td><code>{{ p.sku }}</code></td><td>{{ p.barcode or '—' }}</td>
         <td>{{ p.cost_price|money }}</td><td class="amount-cell">{{ p.sale_price|money }}</td><td><span class="stock-tag {{ 'stock-tag-low' if p.stock <= p.minimum_stock }}">{{ p.stock }}</span></td>
         <td><span class="status {{ 'status-green' if p.active else 'status-gray' }}">{{ 'Activo' if p.active else 'Inactivo' }}</span></td>

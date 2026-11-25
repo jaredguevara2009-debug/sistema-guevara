@@ -117,8 +117,8 @@ Las pruebas cubren el descuento de existencias una sola vez, la recepción de co
 
 ## Imágenes, migraciones y respaldos
 
-- Las imágenes que se suben desde el formulario se guardan en `app/static/uploads/products/`, con nombre aleatorio y salida WebP. El catálogo también ofrece cinco imágenes WebP incluidas en `app/static/img/products/`. MySQL conserva únicamente la ruta de cada imagen.
-- Al abrir por primera vez la aplicación después de actualizarla, se crean las tablas adicionales de perfil de clientes y proveedores si aún no existen; no se modifican las tablas comerciales existentes.
+- Las imágenes subidas se optimizan a WebP y sus bytes se guardan en `product_images`, en la misma base de datos que los productos. Las cinco imágenes WebP incluidas en `app/static/img/products/` siguen siendo archivos estáticos. Si una foto antigua aún existe en `app/static/uploads/products/`, se copia a `product_images` al mostrarse por primera vez; el archivo original se conserva durante esa migración. Si el archivo antiguo ya desapareció del disco del servidor, hay que volver a subir la foto o elegir una imagen incluida.
+- Al abrir por primera vez la aplicación después de actualizarla, se crean las tablas aditivas de perfiles, imágenes de productos y relación marca-categoría si aún no existen. Los enlaces marca-categoría se inicializan a partir de los productos existentes. No se eliminan ni se cambian productos o marcas.
 - Al modificar modelos en una versión futura, usa `flask db migrate -m "describe el cambio"` y revisa el archivo creado antes de `flask db upgrade`.
 - Para copias manuales de MySQL, desde PowerShell usa `mysqldump --user rg_user --password --single-transaction --default-character-set=utf8mb4 repuestos_guevara > .\respaldo-repuestos-guevara.sql`. MySQL solicitará la contraseña. Guarda los respaldos cifrados fuera de `app/static` y limita el acceso.
 - Para restaurar en una base preparada: `Get-Content .\respaldo-repuestos-guevara.sql | mysql --user rg_user --password repuestos_guevara`. Haz una copia del estado actual antes de restaurar.

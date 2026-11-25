@@ -6,7 +6,8 @@ from zoneinfo import ZoneInfo
 
 import click
 from dotenv import load_dotenv
-from flask import Flask
+from flask import Flask, url_for
+from sqlalchemy import insert, select
 
 load_dotenv()
 
@@ -41,19 +42,57 @@ def create_app(config_object=Config):
     app.register_blueprint(catalog_bp, url_prefix="/catalogo")
     app.register_blueprint(operations_bp, url_prefix="/operaciones")
 
-    profile_tables_ready = False
+    optional_tables_ready = False
 
     @app.before_request
-    def ensure_optional_directory_tables():
-        """Create additive profile tables for older deployed databases on first use."""
-        nonlocal profile_tables_ready
-        if profile_tables_ready:
+    def ensure_optional_tables():
+        """Create additive tables and link legacy product brand/category pairs."""
+        nonlocal optional_tables_ready
+        if optional_tables_ready:
             return
-        from app.models import CustomerProfile, SupplierProfile
+        from app.models import CustomerProfile, Product, ProductImage, SupplierProfile, brand_categories
 
         CustomerProfile.__table__.create(bind=db.engine, checkfirst=True)
         SupplierProfile.__table__.create(bind=db.engine, checkfirst=True)
-        profile_tables_ready = True
+        ProductImage.__table__.create(bind=db.engine, checkfirst=True)
+        brand_categories.create(bind=db.engine, checkfirst=True)
+
+        legacy_pairs = db.session.execute(
+            select(Product.brand_id, Product.category_id)
+            .where(Product.brand_id.is_not(None), Product.category_id.is_not(None))
+            .distinct()
+        ).all()
+        if legacy_pairs:
+            rows = [{"brand_id": brand_id, "category_id": category_id}
+                    for brand_id, category_id in legacy_pairs]
+            dialect = db.engine.dialect.name
+            if dialect == "mysql":
+                from sqlalchemy.dialects.mysql import insert as mysql_insert
+                statement = mysql_insert(brand_categories).values(rows).prefix_with("IGNORE")
+            elif dialect == "sqlite":
+                from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+                statement = sqlite_insert(brand_categories).values(rows).on_conflict_do_nothing()
+            elif dialect == "postgresql":
+                from sqlalchemy.dialects.postgresql import insert as pg_insert
+                statement = pg_insert(brand_categories).values(rows).on_conflict_do_nothing()
+            else:
+                present = set(db.session.execute(select(
+                    brand_categories.c.brand_id, brand_categories.c.category_id
+                )).all())
+                rows = [row for row in rows if (row["brand_id"], row["category_id"]) not in present]
+                statement = insert(brand_categories).values(rows) if rows else None
+            if statement is not None:
+                db.session.execute(statement)
+                db.session.commit()
+        optional_tables_ready = True
+
+    @app.template_global()
+    def product_image_url(product):
+        if not product or not product.image_path:
+            return ""
+        if product.image_path == "database" or product.image_path.startswith("uploads/products/"):
+            return url_for("catalog.product_image", product_id=product.id)
+        return url_for("static", filename=product.image_path)
 
     @app.after_request
     def security_headers(response):

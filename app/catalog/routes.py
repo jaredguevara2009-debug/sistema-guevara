@@ -1,8 +1,9 @@
 from decimal import Decimal, InvalidOperation
+from hashlib import sha256
+from io import BytesIO
 from pathlib import Path
-from uuid import uuid4
 
-from flask import abort, current_app, flash, redirect, render_template, request, url_for
+from flask import Response, abort, current_app, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 from PIL import Image, UnidentifiedImageError
 from sqlalchemy import or_
@@ -12,7 +13,7 @@ from app.catalog import bp
 from app.extensions import db
 from app.models import (
     AuditLog, Brand, Category, Customer, CustomerProfile, InventoryMovement,
-    Product, Purchase, PurchaseLine, Sale, SaleLine, Supplier, SupplierProfile,
+    Product, ProductImage, Purchase, PurchaseLine, Sale, SaleLine, Supplier, SupplierProfile,
 )
 from app.security import roles_required
 from app.validation import normalize_email
@@ -57,23 +58,67 @@ def save_product_image(file):
         image.thumbnail((1600, 1600))
         if image.mode not in {"RGB", "RGBA"}:
             image = image.convert("RGBA" if "transparency" in image.info else "RGB")
-        name = f"{uuid4().hex}.webp"
-        target = Path(current_app.config["UPLOAD_FOLDER"]) / name
-        image.save(target, "WEBP", quality=88, method=6)
-        return f"uploads/products/{name}"
+        output = BytesIO()
+        image.save(output, "WEBP", quality=86, method=6)
+        image_data = output.getvalue()
+        if len(image_data) > 8 * 1024 * 1024:
+            raise ValueError("La imagen optimizada sigue superando el límite de 8 MB.")
+        return image_data
     except (UnidentifiedImageError, OSError, Image.DecompressionBombError):
         raise ValueError("El archivo no contiene una imagen válida.")
 
 
-def remove_product_image(path):
-    """Remove only files inside the product upload directory."""
+def product_upload_path(path):
+    """Resolve a legacy upload name inside the configured upload directory."""
     if not path or not path.startswith("uploads/products/"):
-        return
+        return None
+    relative = Path(path)
+    if len(relative.parts) != 3 or relative.parts[:2] != ("uploads", "products"):
+        return None
     uploads = Path(current_app.config["UPLOAD_FOLDER"]).resolve()
-    target = (Path(current_app.static_folder) / path).resolve()
+    target = (uploads / relative.name).resolve()
     try:
         target.relative_to(uploads)
     except ValueError:
+        return None
+    return target
+
+
+@bp.get("/productos/<int:product_id>/imagen")
+@login_required
+def product_image(product_id):
+    product = db.get_or_404(Product, product_id)
+    stored = product.image_blob
+    if stored:
+        data, mimetype = stored.image_data, stored.mime_type
+        response = Response(data, mimetype=mimetype)
+        response.set_etag(sha256(data).hexdigest())
+        response.headers["Cache-Control"] = "private, no-cache"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        return response.make_conditional(request)
+    target = product_upload_path(product.image_path)
+    if target:
+        if target.is_file():
+            # Move the legacy file into durable DB storage when it is first viewed.
+            data = target.read_bytes()
+            if len(data) > 8 * 1024 * 1024:
+                abort(404)
+            stored = ProductImage(product_id=product.id, image_data=data, mime_type="image/webp")
+            product.image_blob = stored
+            product.image_path = "database"
+            db.session.commit()
+            response = Response(data, mimetype="image/webp")
+            response.set_etag(sha256(data).hexdigest())
+            response.headers["Cache-Control"] = "private, no-cache"
+            response.headers["X-Content-Type-Options"] = "nosniff"
+            return response.make_conditional(request)
+    abort(404)
+
+
+def remove_product_image(path):
+    """Remove only files inside the product upload directory."""
+    target = product_upload_path(path)
+    if not target:
         return
     if target.is_file():
         target.unlink()
@@ -148,6 +193,8 @@ def product_form(product_id=None):
                 brand = db.session.get(Brand, product.brand_id)
                 if not brand or (not brand.active and brand.id != original_brand_id):
                     raise ValueError("Selecciona una marca activa.")
+                if product.category_id and product.category_id not in {category.id for category in brand.categories}:
+                    raise ValueError("La marca seleccionada no está asociada a esta categoría.")
             if product.supplier_id:
                 supplier = db.session.get(Supplier, product.supplier_id)
                 if not supplier or (not supplier.active and supplier.id != original_supplier_id):
@@ -160,13 +207,20 @@ def product_form(product_id=None):
             uploaded = save_product_image(request.files.get("image"))
             old_image = product.image_path
             if uploaded:
-                product.image_path = uploaded
+                product.image_path = "database"
             elif product.id and request.form.get("remove_image") == "1":
                 product.image_path = None
             elif request.form.get("image_asset") in PRODUCT_IMAGE_PATHS:
                 product.image_path = request.form.get("image_asset")
             db.session.add(product)
             db.session.flush()
+            if uploaded:
+                stored = product.image_blob or ProductImage(product_id=product.id)
+                stored.image_data = uploaded
+                stored.mime_type = "image/webp"
+                db.session.add(stored)
+            elif product.id and request.form.get("remove_image") == "1" and product.image_blob:
+                db.session.delete(product.image_blob)
             if is_new and stock:
                 db.session.add(InventoryMovement(product_id=product.id, user_id=current_user.id,
                     movement_type="initial", quantity=stock, before_stock=0, after_stock=stock,
@@ -238,16 +292,36 @@ def taxonomy_page(model, title, kind, route_name):
         if item_id and not item:
             abort(404)
         name = request.form.get("name", "").strip()
+        selected_category_ids = request.form.getlist("category_ids", type=int) if model is Brand else []
+        selected_categories = []
+        category_error = None
+        if model is Brand:
+            selected_categories = Category.query.filter(Category.id.in_(selected_category_ids)).all() if selected_category_ids else []
+            if not selected_categories:
+                category_error = "Selecciona al menos una categoría para esta marca."
+            elif len(selected_categories) != len(set(selected_category_ids)):
+                category_error = "Una de las categorías seleccionadas ya no existe."
+            elif any(not category.active and category not in item.categories for category in selected_categories):
+                category_error = "Solo puedes agregar categorías activas."
+            elif item_id and item:
+                used_categories = {category_id for (category_id,) in db.session.query(Product.category_id).filter(
+                    Product.brand_id == item.id, Product.category_id.is_not(None)).distinct().all()}
+                if not used_categories.issubset(set(selected_category_ids)):
+                    category_error = "No se pueden quitar categorías que ya usan productos registrados."
         if not name:
             flash(f"Escribe el nombre de la {kind}.", "error")
         elif len(name) > 100:
             flash("El nombre supera los 100 caracteres permitidos.", "error")
         elif model.query.filter(model.name == name, model.id != (item.id or 0)).first():
             flash(f"Ya existe una {kind} con ese nombre.", "error")
+        elif category_error:
+            flash(category_error, "error")
         else:
             item.name = name
             if model is Category:
                 item.description = request.form.get("description", "").strip() or None
+            else:
+                item.categories = selected_categories
             db.session.add(item)
             audit(f"{kind.title()} {'actualizada' if item_id else 'creada'}", name, f"{kind}:{item.id}" if item_id else None)
             db.session.commit()
@@ -256,8 +330,20 @@ def taxonomy_page(model, title, kind, route_name):
         editing = item if item_id else None
         form_data = request.form
     rows = model.query.order_by(model.name).all()
+    active_categories = Category.query.filter(Category.active.is_(True)).order_by(Category.name).all()
+    if editing and model is Brand:
+        inactive_linked = [category for category in editing.categories if not category.active]
+        active_categories.extend(inactive_linked)
+        active_categories.sort(key=lambda category: category.name.casefold())
+    if form_data and model is Brand:
+        selected_category_ids = form_data.getlist("category_ids", type=int)
+    elif editing and model is Brand:
+        selected_category_ids = [category.id for category in editing.categories]
+    else:
+        selected_category_ids = []
     return render_template("catalog/taxonomy.html", title=title, rows=rows, endpoint=route_name,
-                           kind=kind, editing=editing, form_data=form_data)
+                           kind=kind, editing=editing, form_data=form_data, categories=active_categories,
+                           selected_category_ids=selected_category_ids)
 
 
 @bp.route("/categorias", methods=["GET", "POST"])

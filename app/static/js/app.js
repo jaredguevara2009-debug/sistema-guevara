@@ -55,6 +55,27 @@
     productImagePreview.replaceChildren(image);
   });
 
+  const categoryField = $("[data-category-field]");
+  const brandField = $("[data-brand-field]");
+  const filterBrandsByCategory = () => {
+    if (!categoryField || !brandField) return;
+    const categoryId = categoryField.value;
+    [...brandField.options].forEach((option) => {
+      if (!option.value || !categoryId) {
+        option.hidden = false;
+        option.disabled = false;
+        return;
+      }
+      const categoryIds = (option.dataset.categoryIds || "").split(",").filter(Boolean);
+      const compatible = categoryIds.includes(categoryId);
+      option.hidden = !compatible;
+      option.disabled = !compatible;
+      if (!compatible && option.selected) brandField.value = "";
+    });
+  };
+  categoryField?.addEventListener("change", filterBrandsByCategory);
+  filterBrandsByCategory();
+
   const canvas = $("#sales-chart");
   if (canvas) {
     const labels = JSON.parse(canvas.dataset.labels || "[]");
