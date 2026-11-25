@@ -27,15 +27,32 @@
     if (!form.reportValidity()) return;
     form.querySelector("button[type=submit]")?.classList.add("is-loading");
   });
-  $("[data-image-input]")?.addEventListener("change", (event) => {
+  const productImageInput = $("[data-image-input]");
+  const productImageSelect = $("[data-image-asset]");
+  const productImagePreview = $("[data-image-preview]");
+  const initialProductPreview = productImagePreview?.innerHTML;
+  productImageInput?.addEventListener("change", (event) => {
     const file = event.currentTarget.files?.[0];
-    const preview = $("[data-image-preview]");
-    if (!file || !preview) return;
-    if (!file.type.startsWith("image/")) return;
+    if (!file || !productImagePreview || !file.type.startsWith("image/")) return;
+    if (productImageSelect) productImageSelect.value = "";
     const image = document.createElement("img");
     image.alt = "Vista previa del producto";
     image.src = URL.createObjectURL(file);
-    preview.replaceChildren(image);
+    productImagePreview.replaceChildren(image);
+  });
+  productImageSelect?.addEventListener("change", (event) => {
+    if (!productImagePreview) return;
+    if (productImageInput) productImageInput.value = "";
+    const option = event.currentTarget.selectedOptions[0];
+    const source = option?.dataset.preview;
+    if (!source) {
+      productImagePreview.innerHTML = initialProductPreview || "";
+      return;
+    }
+    const image = document.createElement("img");
+    image.alt = "Vista previa del producto";
+    image.src = source;
+    productImagePreview.replaceChildren(image);
   });
 
   const canvas = $("#sales-chart");

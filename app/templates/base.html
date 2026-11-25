@@ -3,9 +3,9 @@
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#17191d"><title>{% block title %}Panel{% endblock %} · {{ business_name }}</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/overrides.css') }}">
-  <script defer src="{{ url_for('static', filename='js/app.js') }}"></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css', v='20261125') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/overrides.css', v='20261125') }}">
+  <script defer src="{{ url_for('static', filename='js/app.js', v='20261125') }}"></script>
   {% block head %}{% endblock %}
 </head>
 <body class="app-shell" data-role="{{ current_user.role }}">
@@ -20,7 +20,8 @@
       <a class="nav-item {{ 'active' if request.endpoint == 'catalog.products' }}" href="{{ url_for('catalog.products') }}"><span class="nav-icon">▦</span>Productos</a>
       {% if current_user.role in ['admin','warehouse'] %}
       <a class="nav-item {{ 'active' if request.endpoint == 'operations.inventory' }}" href="{{ url_for('operations.inventory') }}"><span class="nav-icon">⇄</span>Inventario</a>
-      <a class="nav-item {{ 'active' if request.endpoint in ['catalog.categories','catalog.brands'] }}" href="{{ url_for('catalog.categories') }}"><span class="nav-icon">◈</span>Categorías y marcas</a>
+      <a class="nav-item {{ 'active' if request.endpoint == 'catalog.categories' }}" href="{{ url_for('catalog.categories') }}"><span class="nav-icon">◈</span>Categorías</a>
+      <a class="nav-item {{ 'active' if request.endpoint == 'catalog.brands' }}" href="{{ url_for('catalog.brands') }}"><span class="nav-icon">◆</span>Marcas</a>
       {% endif %}
       <div class="nav-caption nav-caption-space">OPERACIONES</div>
       {% if current_user.role in ['admin','seller'] %}

@@ -41,6 +41,20 @@ def create_app(config_object=Config):
     app.register_blueprint(catalog_bp, url_prefix="/catalogo")
     app.register_blueprint(operations_bp, url_prefix="/operaciones")
 
+    profile_tables_ready = False
+
+    @app.before_request
+    def ensure_optional_directory_tables():
+        """Create additive profile tables for older deployed databases on first use."""
+        nonlocal profile_tables_ready
+        if profile_tables_ready:
+            return
+        from app.models import CustomerProfile, SupplierProfile
+
+        CustomerProfile.__table__.create(bind=db.engine, checkfirst=True)
+        SupplierProfile.__table__.create(bind=db.engine, checkfirst=True)
+        profile_tables_ready = True
+
     @app.after_request
     def security_headers(response):
         response.headers.setdefault("X-Content-Type-Options", "nosniff")

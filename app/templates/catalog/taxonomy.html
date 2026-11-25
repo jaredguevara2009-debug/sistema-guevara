@@ -1,1 +1,44 @@
-{% extends 'base.html' %}{% block title %}{{ title }}{% endblock %}{% block page_title %}{{ title }}{% endblock %}{% block content %}<div class="page-heading"><div><div class="eyebrow">CATÁLOGO</div><h1>{{ title }}</h1><p>Organiza el catálogo sin perder las referencias de productos existentes.</p></div></div><div class="split-layout"><section class="panel form-card"><div class="panel-head"><div><h2>Nueva {{ kind }}</h2><p>Agrega una opción al catálogo</p></div></div><form method="post" class="stack-form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><label class="field"><span>Nombre <b>*</b></span><input required maxlength="100" name="name" placeholder="Nombre de {{ kind }}"></label>{% if kind=='categoría' %}<label class="field"><span>Descripción</span><textarea name="description" rows="3"></textarea></label>{% endif %}<button class="btn btn-primary" type="submit">Crear {{ kind }} <span>→</span></button></form></section><section class="panel list-panel"><div class="panel-head padded-head"><div><h2>Registradas</h2><p>{{ rows|length }} {{ kind }}(s)</p></div></div><div class="table-scroll"><table><thead><tr><th>NOMBRE</th>{% if kind=='categoría' %}<th>DESCRIPCIÓN</th>{% endif %}<th>ESTADO</th><th></th></tr></thead><tbody>{% for row in rows %}<tr><td class="table-primary">{{ row.name }}</td>{% if kind=='categoría' %}<td>{{ row.description or '—' }}</td>{% endif %}<td><span class="status {{ 'status-green' if row.active else 'status-gray' }}">{{ 'Activa' if row.active else 'Inactiva' }}</span></td><td><form method="post" action="{{ url_for('catalog.toggle_taxonomy',kind='categorias' if kind=='categoría' else 'marcas',item_id=row.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="text-button" type="submit">{{ 'Desactivar' if row.active else 'Activar' }}</button></form></td></tr>{% else %}<tr><td colspan="4"><div class="empty-state"><strong>No hay registros todavía</strong><small>Crea el primer elemento con el formulario.</small></div></td></tr>{% endfor %}</tbody></table></div></section></div>{% endblock %}
+{% extends 'base.html' %}
+{% block title %}{{ title }}{% endblock %}
+{% block page_title %}{{ title }}{% endblock %}
+{% block content %}
+<div class="page-heading">
+  <div><div class="eyebrow">CATÁLOGO</div><h1>{{ title }}</h1><p>Administra las opciones que aparecen al registrar y editar productos.</p></div>
+</div>
+<nav class="taxonomy-tabs" aria-label="Catálogo">
+  <a class="{{ 'active' if endpoint == 'catalog.categories' }}" href="{{ url_for('catalog.categories') }}">Categorías</a>
+  <a class="{{ 'active' if endpoint == 'catalog.brands' }}" href="{{ url_for('catalog.brands') }}">Marcas</a>
+</nav>
+<div class="split-layout">
+  <section class="panel form-card">
+    <div class="panel-head"><div><h2>{{ 'Editar' if editing else 'Nueva' }} {{ kind }}</h2><p>{{ 'Actualiza esta opción del catálogo' if editing else 'Se podrá seleccionar al guardar un producto' }}</p></div></div>
+    <form method="post" action="{{ url_for(endpoint) }}" class="stack-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      {% if editing %}<input type="hidden" name="item_id" value="{{ editing.id }}">{% endif %}
+      <label class="field"><span>Nombre <b>*</b></span><input required maxlength="100" name="name" value="{{ form_data.get('name','') if form_data else (editing.name if editing else '') }}" placeholder="Nombre de {{ kind }}"></label>
+      {% if kind == 'categoría' %}<label class="field"><span>Descripción</span><textarea name="description" rows="3">{{ form_data.get('description','') if form_data else (editing.description if editing else '') }}</textarea></label>{% endif %}
+      <div class="form-actions inline-actions"><button class="btn btn-primary" type="submit">{{ 'Guardar cambios' if editing else 'Crear ' ~ kind }} <span>→</span></button>{% if editing %}<a class="btn btn-quiet" href="{{ url_for(endpoint) }}">Cancelar</a>{% endif %}</div>
+    </form>
+  </section>
+  <section class="panel list-panel">
+    <div class="panel-head padded-head"><div><h2>Registradas</h2><p>{{ rows|length }} {{ kind }}(s)</p></div><span class="status status-green">{{ rows|selectattr('active')|list|length }} activas</span></div>
+    <div class="table-scroll"><table>
+      <thead><tr><th>NOMBRE</th>{% if kind == 'categoría' %}<th>DESCRIPCIÓN</th>{% endif %}<th>ESTADO</th><th>ACCIONES</th></tr></thead>
+      <tbody>
+      {% for row in rows %}
+        <tr>
+          <td class="table-primary">{{ row.name }}</td>
+          {% if kind == 'categoría' %}<td>{{ row.description or '—' }}</td>{% endif %}
+          <td><span class="status {{ 'status-green' if row.active else 'status-gray' }}">{{ 'Activa' if row.active else 'Inactiva' }}</span></td>
+          <td><div class="row-actions">
+            <a class="btn btn-quiet btn-small" href="{{ url_for(endpoint, editar=row.id) }}">Editar</a>
+            <form method="post" action="{{ url_for('catalog.toggle_taxonomy',kind='categorias' if kind=='categoría' else 'marcas',item_id=row.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="text-button" type="submit">{{ 'Desactivar' if row.active else 'Activar' }}</button></form>
+            <form method="post" action="{{ url_for('catalog.delete_taxonomy',kind='categorias' if kind=='categoría' else 'marcas',item_id=row.id) }}" data-confirm="¿Eliminar {{ row.name }}? Si hay productos asociados, se desactivará para conservarlos."><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="text-button danger-text" type="submit">Eliminar</button></form>
+          </div></td>
+        </tr>
+      {% else %}<tr><td colspan="{{ 4 if kind == 'categoría' else 3 }}"><div class="empty-state"><strong>No hay {{ kind }}s todavía</strong><small>Crea el primero con el formulario.</small></div></td></tr>{% endfor %}
+      </tbody>
+    </table></div>
+  </section>
+</div>
+{% endblock %}

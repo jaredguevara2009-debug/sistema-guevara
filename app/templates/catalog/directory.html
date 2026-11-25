@@ -1,1 +1,57 @@
-{% extends 'base.html' %}{% block title %}{{ label }}es{% endblock %}{% block page_title %}{{ label }}es{% endblock %}{% block content %}<div class="page-heading"><div><div class="eyebrow">RELACIONES COMERCIALES</div><h1>{{ label }}es</h1><p>Consulta y registra {{ 'las personas que compran en tu negocio' if kind=='clientes' else 'las empresas y personas que abastecen tu negocio' }}.</p></div></div><div class="directory-layout"><section class="panel form-card"><div class="panel-head"><div><h2>Nuevo {{ label|lower }}</h2><p>Los campos opcionales se pueden completar después.</p></div></div><form method="post" class="stack-form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% for field in fields %}<label class="field"><span>{{ {'name':'Nombre comercial' if kind=='proveedores' else 'Nombre completo','contact':'Persona de contacto','phone':'Teléfono / WhatsApp','email':'Correo electrónico','nit':'NIT / identificación','document':'CI / identificación','address':'Dirección'}.get(field,field|capitalize) }}{% if field=='name' %} <b>*</b>{% endif %}</span><input name="{{ field }}" {{ 'required' if field=='name' }} maxlength="{{ 160 if field=='name' else 255 }}" type="{{ 'email' if field=='email' else 'text' }}" placeholder="{{ 'Ej. Taller Guevara' if field=='name' and kind=='proveedores' else 'Completar si corresponde' }}"></label>{% endfor %}<button class="btn btn-primary" type="submit">Guardar {{ label|lower }} <span>→</span></button></form></section><section class="panel list-panel"><div class="list-toolbar"><form class="search-form" method="get"><span>⌕</span><input name="q" value="{{ q }}" placeholder="Buscar por nombre"><button class="btn btn-quiet" type="submit">Buscar</button></form><span class="result-count">{{ page.total }} registros</span></div><div class="table-scroll"><table><thead><tr><th>NOMBRE</th><th>CONTACTO</th><th>TELÉFONO</th><th>CORREO</th><th>ESTADO</th><th></th></tr></thead><tbody>{% for row in page.items %}<tr><td><strong class="table-primary">{{ row.name }}</strong>{% if row.is_default %}<span class="status status-blue">Predeterminado</span>{% endif %}</td><td>{{ row.contact if kind=='proveedores' else row.document or '—' }}</td><td>{{ row.phone or '—' }}</td><td>{{ row.email or '—' }}</td><td><span class="status {{ 'status-green' if row.active else 'status-gray' }}">{{ 'Activo' if row.active else 'Inactivo' }}</span></td><td>{% if not row.is_default %}<form method="post" action="{{ url_for('catalog.toggle_directory',kind=kind,item_id=row.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="text-button" type="submit">{{ 'Desactivar' if row.active else 'Activar' }}</button></form>{% endif %}</td></tr>{% else %}<tr><td colspan="6"><div class="empty-state"><span>♙</span><strong>Aún no hay {{ label|lower }}es</strong><small>Agrega un registro con el formulario.</small></div></td></tr>{% endfor %}</tbody></table></div>{% if page.pages>1 %}<div class="pagination"><span>{{ page.first }}–{{ page.last }} de {{ page.total }}</span><div>{% if page.has_prev %}<a href="{{ url_for('catalog.directory',kind=kind,q=q,page=page.prev_num) }}">← Anterior</a>{% endif %}{% if page.has_next %}<a href="{{ url_for('catalog.directory',kind=kind,q=q,page=page.next_num) }}">Siguiente →</a>{% endif %}</div></div>{% endif %}</section></div>{% endblock %}
+{% extends 'base.html' %}
+{% block title %}{{ 'Clientes' if kind == 'clientes' else 'Proveedores' }}{% endblock %}
+{% block page_title %}{{ 'Clientes' if kind == 'clientes' else 'Proveedores' }}{% endblock %}
+{% block content %}
+<div class="page-heading"><div><div class="eyebrow">RELACIONES COMERCIALES</div><h1>{{ label }}es</h1><p>{{ 'Organiza contactos, marcas distribuidas y condiciones de compra.' if kind == 'proveedores' else 'Guarda los datos de contacto y las motocicletas de tus clientes.' }}</p></div></div>
+<div class="directory-layout">
+  <section class="panel form-card">
+    <div class="panel-head"><div><h2>{{ 'Editar' if editing else 'Nuevo' }} {{ label|lower }}</h2><p>Los campos opcionales se pueden completar después.</p></div></div>
+    <form method="post" class="stack-form" action="{{ url_for('catalog.directory',kind=kind) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      {% if editing %}<input type="hidden" name="edit_id" value="{{ editing.id }}">{% endif %}
+      {% for field in fields %}
+        {% set item_value = profile_data.get(field, '') if profile_data else (editing|attr(field) if editing else '') %}
+        <label class="field"><span>{{ {'name':'Nombre comercial' if kind=='proveedores' else 'Nombre completo','contact':'Persona de contacto','phone':'Teléfono / WhatsApp','email':'Correo electrónico','nit':'NIT / identificación','document':'CI / identificación','address':'Dirección'}.get(field,field|capitalize) }}{% if field=='name' %} <b>*</b>{% endif %}</span><input name="{{ field }}" {{ 'required' if field=='name' }} maxlength="{{ 160 if field=='name' else 255 }}" type="{{ 'email' if field=='email' else 'text' }}" value="{{ item_value or '' }}" placeholder="{{ 'Ej. Importadora JRS' if field=='name' and kind=='proveedores' else 'Completar si corresponde' }}"></label>
+      {% endfor %}
+      {% if kind == 'proveedores' %}
+        {% set brands_value = profile_data.get('brands','') if profile_data else (editing.profile.brands if editing and editing.profile else '') %}
+        {% set terms_value = profile_data.get('terms','') if profile_data else (editing.profile.terms if editing and editing.profile else '') %}
+        <label class="field"><span>Marcas y productos que distribuye</span><textarea name="brands" rows="2" maxlength="255" placeholder="Ej. NGK, Yuasa, repuestos universales">{{ brands_value }}</textarea></label>
+        <label class="field"><span>Condiciones comerciales</span><input name="terms" maxlength="100" value="{{ terms_value }}" placeholder="Ej. Por mayor y menor"></label>
+      {% else %}
+        {% set motorcycle_value = profile_data.get('motorcycle','') if profile_data else (editing.profile.motorcycle if editing and editing.profile else '') %}
+        {% set notes_value = profile_data.get('notes','') if profile_data else (editing.profile.notes if editing and editing.profile else '') %}
+        {% set demo_value = profile_data.get('demo') == '1' if profile_data else (editing.profile.demo if editing and editing.profile else false) %}
+        <label class="field"><span>Motocicleta</span><input name="motorcycle" maxlength="160" value="{{ motorcycle_value }}" placeholder="Ej. Honda CGL 125"></label>
+        <label class="field"><span>Notas del cliente</span><textarea name="notes" rows="2" maxlength="255" placeholder="Preferencias o consultas pendientes">{{ notes_value }}</textarea></label>
+        <label class="check-field"><input type="checkbox" name="demo" value="1" {{ 'checked' if demo_value }}><span>Marcar como dato de demostración</span></label>
+      {% endif %}
+      <div class="form-actions inline-actions"><button class="btn btn-primary" type="submit">{{ 'Guardar cambios' if editing else 'Guardar ' ~ label|lower }} <span>→</span></button>{% if editing %}<a class="btn btn-quiet" href="{{ url_for('catalog.directory',kind=kind) }}">Cancelar</a>{% endif %}</div>
+    </form>
+  </section>
+  <section class="panel list-panel">
+    <div class="list-toolbar"><form class="search-form" method="get"><span>⌕</span><input name="q" value="{{ q }}" placeholder="Buscar por nombre"><button class="btn btn-quiet" type="submit">Buscar</button></form><span class="result-count">{{ page.total }} registros</span></div>
+    <div class="table-scroll"><table><thead><tr><th>NOMBRE</th><th>DETALLES</th><th>TELÉFONO</th><th>ESTADO</th><th>ACCIONES</th></tr></thead><tbody>
+    {% for row in page.items %}
+      <tr>
+        <td><strong class="table-primary">{{ row.name }}</strong>{% if row.is_default %}<span class="status status-blue">Predeterminado</span>{% endif %}{% if kind == 'proveedores' and row.address %}<small class="table-subcopy">{{ row.address }}</small>{% endif %}</td>
+        <td class="profile-details">
+          {% if kind == 'proveedores' %}
+            <strong>{{ row.profile.brands if row.profile and row.profile.brands else 'Marcas no registradas' }}</strong><small>{{ row.profile.terms if row.profile and row.profile.terms else 'Condiciones no registradas' }}{% if row.contact %} · Contacto: {{ row.contact }}{% endif %}</small>
+          {% else %}
+            <strong>{{ row.profile.motorcycle if row.profile and row.profile.motorcycle else 'Moto no registrada' }}</strong><small>{{ row.profile.notes if row.profile and row.profile.notes else (row.address or 'Sin notas') }}{% if row.profile and row.profile.demo %} <span class="demo-badge">DEMO</span>{% endif %}</small>
+          {% endif %}
+        </td>
+        <td>{{ row.phone or '—' }}</td><td><span class="status {{ 'status-green' if row.active else 'status-gray' }}">{{ 'Activo' if row.active else 'Inactivo' }}</span></td>
+        <td><div class="row-actions directory-actions">
+          {% if not row.is_default %}<a class="btn btn-quiet btn-small" href="{{ url_for('catalog.directory',kind=kind,editar=row.id) }}">Editar</a>
+          <form method="post" action="{{ url_for('catalog.toggle_directory',kind=kind,item_id=row.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="text-button" type="submit">{{ 'Desactivar' if row.active else 'Activar' }}</button></form>
+          {% if current_user.role == 'admin' %}<form method="post" action="{{ url_for('catalog.delete_directory',kind=kind,item_id=row.id) }}" data-confirm="¿Eliminar {{ row.name }}? Si tiene compras o ventas relacionadas, se desactivará para conservar el historial."><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="text-button danger-text" type="submit">Eliminar</button></form>{% endif %}{% endif %}
+        </div></td>
+      </tr>
+    {% else %}<tr><td colspan="5"><div class="empty-state"><span>♙</span><strong>Aún no hay {{ 'clientes' if kind == 'clientes' else 'proveedores' }}</strong><small>Agrega un registro con el formulario.</small></div></td></tr>{% endfor %}
+    </tbody></table></div>
+    {% if page.pages>1 %}<div class="pagination"><span>{{ page.first }}–{{ page.last }} de {{ page.total }}</span><div>{% if page.has_prev %}<a href="{{ url_for('catalog.directory',kind=kind,q=q,page=page.prev_num) }}">← Anterior</a>{% endif %}{% if page.has_next %}<a href="{{ url_for('catalog.directory',kind=kind,q=q,page=page.next_num) }}">Siguiente →</a>{% endif %}</div></div>{% endif %}
+  </section>
+</div>
+{% endblock %}

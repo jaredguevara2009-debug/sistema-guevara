@@ -8,9 +8,11 @@ Para ver el diseño sin instalar dependencias, abre `preview.html` en el navegad
 
 - Inicio de sesión privado, contraseñas con hash, protección CSRF, bloqueo temporal de intentos fallidos por IP y roles de administrador, vendedor, almacenero y consulta.
 - Dashboard conectado a la base, con ventas del día y mes, productos, alertas de stock, actividad reciente y gráfica de siete días.
-- Catálogo de productos con búsqueda, precios, SKU, categorías, marcas, proveedor, compatibilidad en texto e imagen principal procesada a WebP.
+- Catálogo de productos con búsqueda por nombre, SKU o código de barras; edición de todos los datos comerciales, foto reemplazable/eliminable, categorías y marcas. Incluye imágenes optimizadas de ejemplo para cinco repuestos.
+- Gestión de categorías y marcas: crear, editar, activar, desactivar y eliminar. Si una opción ya está asociada a productos, se archiva para conservar esas referencias.
 - Control de existencias con historial de movimientos y ajustes justificados; no permite stock negativo.
-- Registro de proveedores y clientes, con protección para el cliente predeterminado Consumidor final.
+- Registro y edición de proveedores (marcas distribuidas y condiciones comerciales) y clientes (motocicleta y notas), con protección para el cliente predeterminado Consumidor final. Los registros de muestra pueden marcarse como demostración.
+- Eliminación segura de productos, clientes y proveedores: conserva como inactivos los registros ligados a stock, ventas o compras anteriores.
 - Compras con múltiples líneas. Una compra pendiente no cambia el stock; la recepción genera movimientos y actualiza el costo promedio ponderado. No se puede recibir dos veces.
 - Punto de venta con validación del lado servidor, descuento limitado por rol, control de existencias, pago de un método por venta, número de operación e idempotencia ante doble envío.
 - Comprobante comercial imprimible, historial de ventas, apertura y cierre de caja, gastos operativos, reportes por periodo y exportación de ventas a CSV.
@@ -19,7 +21,7 @@ Para ver el diseño sin instalar dependencias, abre `preview.html` en el navegad
 
 ## Alcance que todavía requiere una fase adicional
 
-Este paquete cubre una primera versión operativa de los procesos principales; no implementa cada punto del prompt maestro. En particular, antes de usarlo como sistema final de producción faltan: devoluciones/anulaciones con reversa transaccional, pagos combinados o saldos por cobrar, PDF descargable y formatos fiscales, galería de varias fotos, compatibilidad estructurada por marca/modelo/año, notificaciones persistentes, compras cancelables/detalladas, edición de clientes/proveedores, exportación a Excel, reportes completos de compras/gastos y respaldos automáticos programados. El comprobante que genera es comercial y nunca se presenta como factura fiscal.
+Este paquete cubre una primera versión operativa de los procesos principales; no implementa cada punto del prompt maestro. En particular, aún faltan devoluciones/anulaciones con reversa transaccional, pagos combinados o saldos por cobrar, PDF descargable y formatos fiscales, galería de varias fotos, compatibilidad estructurada por marca/modelo/año, notificaciones persistentes, compras cancelables/detalladas, exportación a Excel, reportes completos de compras/gastos y respaldos automáticos programados. El comprobante que genera es comercial y nunca se presenta como factura fiscal.
 
 El logotipo original está en `app/static/img/logo.png`. La aplicación muestra el archivo en acceso, menú, vista previa y comprobantes; conserva el PNG original y ajusta solo su tamaño de presentación.
 
@@ -115,7 +117,8 @@ Las pruebas cubren el descuento de existencias una sola vez, la recepción de co
 
 ## Imágenes, migraciones y respaldos
 
-- Las imágenes de productos se guardan en `app/static/uploads/products/`, con nombre aleatorio y salida WebP. MySQL conserva únicamente la ruta.
+- Las imágenes que se suben desde el formulario se guardan en `app/static/uploads/products/`, con nombre aleatorio y salida WebP. El catálogo también ofrece cinco imágenes WebP incluidas en `app/static/img/products/`. MySQL conserva únicamente la ruta de cada imagen.
+- Al abrir por primera vez la aplicación después de actualizarla, se crean las tablas adicionales de perfil de clientes y proveedores si aún no existen; no se modifican las tablas comerciales existentes.
 - Al modificar modelos en una versión futura, usa `flask db migrate -m "describe el cambio"` y revisa el archivo creado antes de `flask db upgrade`.
 - Para copias manuales de MySQL, desde PowerShell usa `mysqldump --user rg_user --password --single-transaction --default-character-set=utf8mb4 repuestos_guevara > .\respaldo-repuestos-guevara.sql`. MySQL solicitará la contraseña. Guarda los respaldos cifrados fuera de `app/static` y limita el acceso.
 - Para restaurar en una base preparada: `Get-Content .\respaldo-repuestos-guevara.sql | mysql --user rg_user --password repuestos_guevara`. Haz una copia del estado actual antes de restaurar.

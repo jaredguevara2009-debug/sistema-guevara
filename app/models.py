@@ -57,6 +57,17 @@ class Supplier(TimestampMixin, db.Model):
     nit = db.Column(db.String(40))
     address = db.Column(db.String(255))
     active = db.Column(db.Boolean, nullable=False, default=True)
+    profile = db.relationship("SupplierProfile", back_populates="supplier", uselist=False,
+                             cascade="all, delete-orphan", passive_deletes=True)
+
+
+class SupplierProfile(db.Model):
+    """Optional supplier details added without changing the legacy suppliers table."""
+    __tablename__ = "supplier_profiles"
+    supplier_id = db.Column(db.Integer, db.ForeignKey("suppliers.id", ondelete="CASCADE"), primary_key=True)
+    brands = db.Column(db.String(255))
+    terms = db.Column(db.String(100))
+    supplier = db.relationship(Supplier, back_populates="profile")
 
 
 class Customer(TimestampMixin, db.Model):
@@ -69,6 +80,18 @@ class Customer(TimestampMixin, db.Model):
     address = db.Column(db.String(255))
     is_default = db.Column(db.Boolean, nullable=False, default=False)
     active = db.Column(db.Boolean, nullable=False, default=True)
+    profile = db.relationship("CustomerProfile", back_populates="customer", uselist=False,
+                              cascade="all, delete-orphan", passive_deletes=True)
+
+
+class CustomerProfile(db.Model):
+    """Optional customer vehicle and notes, separate from legacy address fields."""
+    __tablename__ = "customer_profiles"
+    customer_id = db.Column(db.Integer, db.ForeignKey("customers.id", ondelete="CASCADE"), primary_key=True)
+    motorcycle = db.Column(db.String(160))
+    notes = db.Column(db.String(255))
+    demo = db.Column(db.Boolean, nullable=False, default=False)
+    customer = db.relationship(Customer, back_populates="profile")
 
 
 class Product(TimestampMixin, db.Model):
